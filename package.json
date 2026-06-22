@@ -1,0 +1,59 @@
+{
+  "name": "n8n-nodes-cellystial",
+  "version": "1.2.0",
+  "description": "n8n community node for Cellystial — generate PDFs from templates via the Cellystial API",
+  "keywords": [
+    "n8n-community-node-package",
+    "n8n",
+    "cellystial",
+    "pdf",
+    "pdf-generation",
+    "document-generation"
+  ],
+  "license": "MIT",
+  "homepage": "https://cellystial.com",
+  "author": {
+    "name": "Cellystial",
+    "url": "https://cellystial.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/knight-koder/cellystial-n8n-app.git"
+  },
+  "bugs": {
+    "url": "https://github.com/knight-koder/cellystial-n8n-app/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "main": "dist/index.js",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && tsc && cp src/nodes/Cellystial/*.png src/nodes/Cellystial/*.svg dist/nodes/Cellystial/",
+    "dev": "tsc --watch",
+    "test": "jest"
+  },
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "credentials": [
+      "dist/credentials/CellystialApi.credentials.js"
+    ],
+    "nodes": [
+      "dist/nodes/Cellystial/Cellystial.node.js",
+      "dist/nodes/Cellystial/CellystialTrigger.node.js"
+    ]
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^20.19.41",
+    "@types/node-fetch": "^2.6.13",
+    "jest": "^30.4.2",
+    "n8n-workflow": "^1.120.15",
+    "node-fetch": "^2.7.0",
+    "nock": "^14.0.15",
+    "ts-jest": "^29.4.11",
+    "typescript": "^5.9.3"
+  }
+}
