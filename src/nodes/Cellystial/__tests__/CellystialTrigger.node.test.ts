@@ -1,5 +1,12 @@
 import { CellystialTrigger } from '../CellystialTrigger.node';
 import { IHookFunctions, IWebhookFunctions, IDataObject } from 'n8n-workflow';
+import * as crypto from 'crypto';
+
+/** Builds a valid `t=<unix>,v1=<hex>` signature for the given raw body + secret. */
+function sign(rawBody: string, secret: string, t = Math.floor(Date.now() / 1000)): string {
+  const v1 = crypto.createHmac('sha256', secret).update(`${t}.${rawBody}`).digest('hex');
+  return `t=${t},v1=${v1}`;
+}
 
 describe('CellystialTrigger Node', () => {
   const node = new CellystialTrigger();
@@ -38,6 +45,25 @@ describe('CellystialTrigger Node', () => {
       });
       expect(staticData.subscriptionId).toBe('wh_1');
     });
+
+    it('stores the per-subscription signing secret when the API returns one', async () => {
+      const staticData: IDataObject = {};
+      const ctx = {
+        getNodeWebhookUrl: (_name: string) => 'https://n8n.test/webhook/abc',
+        getNodeParameter: (name: string) => (name === 'events' ? ['pdf.generated'] : undefined),
+        getWorkflowStaticData: (_type: string) => staticData,
+        getNode: () => ({ name: 'Cellystial Trigger' }),
+        helpers: {
+          requestWithAuthentication: async function () {
+            return { id: 'wh_2', secret: 'whsec_abc123' };
+          },
+        },
+      } as unknown as IHookFunctions;
+
+      await node.webhookMethods.default.create.call(ctx);
+      expect(staticData.subscriptionId).toBe('wh_2');
+      expect(staticData.signingSecret).toBe('whsec_abc123');
+    });
   });
 
   describe('webhookMethods.checkExists', () => {
@@ -51,7 +77,7 @@ describe('CellystialTrigger Node', () => {
 
   describe('webhookMethods.delete', () => {
     it('deletes the stored subscription and clears local state', async () => {
-      const staticData: IDataObject = { subscriptionId: 'wh_1' };
+      const staticData: IDataObject = { subscriptionId: 'wh_1', signingSecret: 'whsec_abc123' };
       let captured: { method?: string; url?: string } = {};
 
       const ctx = {
@@ -70,21 +96,76 @@ describe('CellystialTrigger Node', () => {
       expect(captured.method).toBe('DELETE');
       expect(captured.url).toMatch(/\/api\/v1\/webhooks\/wh_1$/);
       expect(staticData.subscriptionId).toBeUndefined();
+      expect(staticData.signingSecret).toBeUndefined();
     });
   });
 
   describe('webhook', () => {
-    it('emits the incoming event body as workflow data', async () => {
-      const ctx = {
-        getBodyData: () => ({ event: 'pdf.generated', filename: 'a.pdf' }),
-        helpers: {
-          returnJsonArray: (data: IDataObject[]) => data.map((json) => ({ json })),
-        },
-      } as unknown as IWebhookFunctions;
+    const SECRET = 'whsec_test_secret';
+    const payload = { event: 'pdf.generated', filename: 'a.pdf' };
+    const rawBody = JSON.stringify(payload);
 
+    // Builds a webhook ctx; captures any response status/body the node sends.
+    function makeCtx(opts: {
+      signingSecret?: string;
+      signature?: string;
+      rawBody?: string;
+    }): { ctx: IWebhookFunctions; sent: { status?: number; body?: unknown } } {
+      const sent: { status?: number; body?: unknown } = {};
+      const ctx = {
+        getBodyData: () => payload,
+        getWorkflowStaticData: (_type: string) =>
+          opts.signingSecret ? { signingSecret: opts.signingSecret } : {},
+        getHeaderData: () => ({ 'x-cellystial-signature': opts.signature ?? '' }),
+        getRequestObject: () => ({ rawBody: Buffer.from(opts.rawBody ?? rawBody) }),
+        getResponseObject: () => ({
+          status: (code: number) => {
+            sent.status = code;
+            return { send: (b: unknown) => { sent.body = b; } };
+          },
+        }),
+        helpers: { returnJsonArray: (data: IDataObject[]) => data.map((json) => ({ json })) },
+      } as unknown as IWebhookFunctions;
+      return { ctx, sent };
+    }
+
+    it('emits the event body when the signature is valid', async () => {
+      const { ctx, sent } = makeCtx({ signingSecret: SECRET, signature: sign(rawBody, SECRET) });
       const res = await node.webhook.call(ctx);
       expect(res.workflowData).toBeDefined();
       expect(res.workflowData![0][0].json).toMatchObject({ event: 'pdf.generated', filename: 'a.pdf' });
+      expect(sent.status).toBeUndefined();
+    });
+
+    it('rejects with 401 and does not start the workflow when the signature is invalid', async () => {
+      const { ctx, sent } = makeCtx({ signingSecret: SECRET, signature: sign(rawBody, 'wrong_secret') });
+      const res = await node.webhook.call(ctx);
+      expect(res.workflowData).toBeUndefined();
+      expect(res.noWebhookResponse).toBe(true);
+      expect(sent.status).toBe(401);
+    });
+
+    it('rejects when the signature header is missing', async () => {
+      const { ctx, sent } = makeCtx({ signingSecret: SECRET, signature: '' });
+      const res = await node.webhook.call(ctx);
+      expect(res.workflowData).toBeUndefined();
+      expect(sent.status).toBe(401);
+    });
+
+    it('rejects a replayed (stale-timestamp) signature', async () => {
+      const stale = sign(rawBody, SECRET, Math.floor(Date.now() / 1000) - 3600);
+      const { ctx, sent } = makeCtx({ signingSecret: SECRET, signature: stale });
+      const res = await node.webhook.call(ctx);
+      expect(res.workflowData).toBeUndefined();
+      expect(sent.status).toBe(401);
+    });
+
+    it('passes through (back-compat) when no signing secret is stored', async () => {
+      const { ctx, sent } = makeCtx({ signature: 'anything' });
+      const res = await node.webhook.call(ctx);
+      expect(res.workflowData).toBeDefined();
+      expect(res.workflowData![0][0].json).toMatchObject({ event: 'pdf.generated' });
+      expect(sent.status).toBeUndefined();
     });
   });
 });

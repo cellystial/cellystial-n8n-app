@@ -1,5 +1,6 @@
 import {
   IExecuteFunctions,
+  IDataObject,
   INodeExecutionData,
   INodeType,
   INodeTypeDescription,
@@ -373,7 +374,9 @@ export class Cellystial implements INodeType {
         const binaryData = await this.helpers.prepareBinaryData(responseData, fileName, 'application/pdf');
 
         returnData.push({
-          json: { success: true },
+          // Carry the input item's JSON through so downstream fields aren't lost,
+          // and flag success. (The generated PDF rides along as binary data.)
+          json: { ...(items[i].json as IDataObject), success: true },
           binary: {
             [binaryPropertyName]: binaryData,
           },
