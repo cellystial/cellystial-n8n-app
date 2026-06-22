@@ -18,10 +18,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/knight-koder/cellystial-n8n-app.git"
+    "url": "git+https://github.com/cellystial/cellystial-n8n-app.git"
   },
   "bugs": {
-    "url": "https://github.com/knight-koder/cellystial-n8n-app/issues"
+    "url": "https://github.com/cellystial/cellystial-n8n-app/issues"
   },
   "engines": {
     "node": ">=20"
@@ -33,7 +33,8 @@
   "scripts": {
     "build": "rm -rf dist && tsc && cp src/nodes/Cellystial/*.png src/nodes/Cellystial/*.svg dist/nodes/Cellystial/",
     "dev": "tsc --watch",
-    "test": "jest"
+    "test": "jest",
+    "prepublishOnly": "npm run build"
   },
   "n8n": {
     "n8nNodesApiVersion": 1,

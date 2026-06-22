@@ -1,8 +1,76 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CellystialTrigger = void 0;
 const n8n_workflow_1 = require("n8n-workflow");
+const crypto = __importStar(require("crypto"));
 const constants_1 = require("../../constants");
+const SIGNATURE_TOLERANCE_SECONDS = 300;
+/**
+ * Verifies a Cellystial `X-Cellystial-Signature` header against the raw body.
+ *
+ * Mirrors the signing scheme in the backend's `webhook-signature.util` and the
+ * published SDKs' `verifyWebhook`: header is `t=<unix>,v1=<hex>` and the HMAC is
+ * `HMAC_SHA256(secret, "<t>.<rawBody>")`, compared in constant time, with a
+ * timestamp-tolerance window to bound replay.
+ */
+function verifySignature(rawBody, signatureHeader, secret) {
+    if (!signatureHeader || !secret)
+        return false;
+    const parts = {};
+    for (const segment of signatureHeader.split(',')) {
+        const idx = segment.indexOf('=');
+        if (idx === -1)
+            continue;
+        const key = segment.slice(0, idx).trim();
+        if (key)
+            parts[key] = segment.slice(idx + 1).trim();
+    }
+    const t = Number(parts.t);
+    if (!parts.t || !Number.isFinite(t) || !parts.v1)
+        return false;
+    const now = Math.floor(Date.now() / 1000);
+    if (Math.abs(now - t) > SIGNATURE_TOLERANCE_SECONDS)
+        return false;
+    const expected = crypto.createHmac('sha256', secret).update(`${t}.${rawBody}`).digest('hex');
+    const a = Buffer.from(expected, 'hex');
+    const b = Buffer.from(parts.v1, 'hex');
+    if (a.length === 0 || a.length !== b.length)
+        return false;
+    return crypto.timingSafeEqual(a, b);
+}
 /**
  * Cellystial Trigger — starts a workflow when a Cellystial event fires.
  *
@@ -89,6 +157,11 @@ class CellystialTrigger {
                     }
                     const webhookData = this.getWorkflowStaticData('node');
                     webhookData.subscriptionId = response.id;
+                    // The per-subscription signing secret is returned exactly once, here. Store it
+                    // so incoming deliveries can be signature-verified (see webhook()).
+                    if (typeof response.secret === 'string' && response.secret) {
+                        webhookData.signingSecret = response.secret;
+                    }
                     return true;
                 },
                 async delete() {
@@ -108,6 +181,7 @@ class CellystialTrigger {
                         // Subscription may already be gone server-side; clear local state regardless.
                     }
                     delete webhookData.subscriptionId;
+                    delete webhookData.signingSecret;
                     return true;
                 },
             },
@@ -115,6 +189,25 @@ class CellystialTrigger {
     }
     async webhook() {
         const body = this.getBodyData();
+        const webhookData = this.getWorkflowStaticData('node');
+        const secret = typeof webhookData.signingSecret === 'string' ? webhookData.signingSecret : '';
+        // Verify the delivery signature when we have a stored secret. Subscriptions
+        // registered before signature support have no secret stored — we can't verify
+        // those, so they pass through (re-activating the workflow re-registers and
+        // captures a secret). Newly registered subscriptions are always verified.
+        if (secret) {
+            const headers = this.getHeaderData();
+            const signature = headers['x-cellystial-signature'] || '';
+            // Verify against the exact bytes received — re-serializing the parsed body
+            // would reorder keys and break the byte-for-byte HMAC.
+            const req = this.getRequestObject();
+            const rawBody = req && req.rawBody && req.rawBody.length ? req.rawBody.toString('utf8') : JSON.stringify(body);
+            if (!verifySignature(rawBody, signature, secret)) {
+                const res = this.getResponseObject();
+                res.status(401).send('Invalid signature');
+                return { noWebhookResponse: true };
+            }
+        }
         return {
             workflowData: [this.helpers.returnJsonArray([body])],
         };
