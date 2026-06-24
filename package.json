@@ -31,10 +31,12 @@
     "dist"
   ],
   "scripts": {
-    "build": "rm -rf dist && tsc && cp src/nodes/Cellystial/*.png src/nodes/Cellystial/*.svg dist/nodes/Cellystial/",
+    "build": "rm -rf dist && tsc && cp src/nodes/Cellystial/*.png src/nodes/Cellystial/*.svg src/nodes/Cellystial/*.json dist/nodes/Cellystial/",
     "dev": "tsc --watch",
     "test": "jest",
-    "prepublishOnly": "npm run build"
+    "lint": "eslint package.json \"src/**/*.ts\"",
+    "lintfix": "eslint --fix package.json \"src/**/*.ts\"",
+    "prepublishOnly": "npm run lint && npm run build"
   },
   "n8n": {
     "n8nNodesApiVersion": 1,
@@ -50,6 +52,9 @@
     "@types/jest": "^30.0.0",
     "@types/node": "^20.19.41",
     "@types/node-fetch": "^2.6.13",
+    "@typescript-eslint/parser": "^8.62.0",
+    "eslint": "^8.57.1",
+    "eslint-plugin-n8n-nodes-base": "^1.16.7",
     "jest": "^30.4.2",
     "n8n-workflow": "^1.120.15",
     "node-fetch": "^2.7.0",

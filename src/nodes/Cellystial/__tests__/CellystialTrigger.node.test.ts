@@ -28,7 +28,7 @@ describe('CellystialTrigger Node', () => {
             options: { method?: string; url?: string; body?: unknown },
           ) {
             captured = options;
-            return { id: 'wh_1' };
+            return { id: 'wh_1', secret: 'whsec_1' };
           },
         },
       } as unknown as IHookFunctions;
@@ -64,10 +64,34 @@ describe('CellystialTrigger Node', () => {
       expect(staticData.subscriptionId).toBe('wh_2');
       expect(staticData.signingSecret).toBe('whsec_abc123');
     });
+
+    it('rolls back (DELETE) and throws when the API returns no signing secret', async () => {
+      const staticData: IDataObject = {};
+      const calls: Array<{ method?: string; url?: string }> = [];
+      const ctx = {
+        getNodeWebhookUrl: (_name: string) => 'https://n8n.test/webhook/abc',
+        getNodeParameter: (name: string) => (name === 'events' ? ['pdf.generated'] : undefined),
+        getWorkflowStaticData: (_type: string) => staticData,
+        getNode: () => ({ name: 'Cellystial Trigger' }),
+        helpers: {
+          requestWithAuthentication: async function (_c: string, options: { method?: string; url?: string }) {
+            calls.push({ method: options.method, url: options.url });
+            return options.method === 'POST' ? { id: 'wh_nosecret' } : {};
+          },
+        },
+      } as unknown as IHookFunctions;
+
+      await expect(node.webhookMethods.default.create.call(ctx)).rejects.toThrow(/signing secret/i);
+      // The orphan subscription is cleaned up, and nothing partial is persisted.
+      expect(calls.map((c) => c.method)).toEqual(['POST', 'DELETE']);
+      expect(calls[1].url).toMatch(/\/api\/v1\/webhooks\/wh_nosecret$/);
+      expect(staticData.subscriptionId).toBeUndefined();
+      expect(staticData.signingSecret).toBeUndefined();
+    });
   });
 
   describe('webhookMethods.checkExists', () => {
-    it('is false before registration and true after', async () => {
+    it('is false before registration and true once a subscription id is stored', async () => {
       const before = { getWorkflowStaticData: () => ({}) } as unknown as IHookFunctions;
       const after = { getWorkflowStaticData: () => ({ subscriptionId: 'wh_1' }) } as unknown as IHookFunctions;
       expect(await node.webhookMethods.default.checkExists.call(before)).toBe(false);
@@ -110,14 +134,30 @@ describe('CellystialTrigger Node', () => {
       signingSecret?: string;
       signature?: string;
       rawBody?: string;
+      noRawBody?: boolean;
+      lazyRawBody?: string;
+      readRawBodyThrows?: boolean;
     }): { ctx: IWebhookFunctions; sent: { status?: number; body?: unknown } } {
       const sent: { status?: number; body?: unknown } = {};
+      const getRequestObject = () => {
+        if (opts.readRawBodyThrows) {
+          return { readRawBody: async () => { throw new Error('stream already consumed'); } };
+        }
+        if (opts.lazyRawBody !== undefined) {
+          // No pre-populated rawBody; readRawBody() lazily buffers it (as n8n would).
+          const req: { rawBody?: Buffer; readRawBody: () => Promise<void> } = {
+            readRawBody: async () => { req.rawBody = Buffer.from(opts.lazyRawBody as string); },
+          };
+          return req;
+        }
+        return opts.noRawBody ? {} : { rawBody: Buffer.from(opts.rawBody ?? rawBody) };
+      };
       const ctx = {
         getBodyData: () => payload,
         getWorkflowStaticData: (_type: string) =>
           opts.signingSecret ? { signingSecret: opts.signingSecret } : {},
         getHeaderData: () => ({ 'x-cellystial-signature': opts.signature ?? '' }),
-        getRequestObject: () => ({ rawBody: Buffer.from(opts.rawBody ?? rawBody) }),
+        getRequestObject,
         getResponseObject: () => ({
           status: (code: number) => {
             sent.status = code;
@@ -160,12 +200,33 @@ describe('CellystialTrigger Node', () => {
       expect(sent.status).toBe(401);
     });
 
-    it('passes through (back-compat) when no signing secret is stored', async () => {
-      const { ctx, sent } = makeCtx({ signature: 'anything' });
+    it('rejects with 401 when the raw body is unavailable (never re-serializes)', async () => {
+      const { ctx, sent } = makeCtx({ signingSecret: SECRET, signature: sign(rawBody, SECRET), noRawBody: true });
+      const res = await node.webhook.call(ctx);
+      expect(res.workflowData).toBeUndefined();
+      expect(sent.status).toBe(401);
+    });
+
+    it('reads the raw body via readRawBody() when n8n has not pre-populated it', async () => {
+      const { ctx, sent } = makeCtx({ signingSecret: SECRET, signature: sign(rawBody, SECRET), lazyRawBody: rawBody });
       const res = await node.webhook.call(ctx);
       expect(res.workflowData).toBeDefined();
       expect(res.workflowData![0][0].json).toMatchObject({ event: 'pdf.generated' });
       expect(sent.status).toBeUndefined();
+    });
+
+    it('rejects with 401 (no uncaught throw) when readRawBody() fails', async () => {
+      const { ctx, sent } = makeCtx({ signingSecret: SECRET, signature: sign(rawBody, SECRET), readRawBodyThrows: true });
+      const res = await node.webhook.call(ctx);
+      expect(res.workflowData).toBeUndefined();
+      expect(sent.status).toBe(401);
+    });
+
+    it('fails closed with 401 when no signing secret is stored', async () => {
+      const { ctx, sent } = makeCtx({ signature: 'anything' });
+      const res = await node.webhook.call(ctx);
+      expect(res.workflowData).toBeUndefined();
+      expect(sent.status).toBe(401);
     });
   });
 });

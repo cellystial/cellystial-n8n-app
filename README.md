@@ -3,12 +3,12 @@
 This is an [n8n](https://n8n.io) community node. It lets you use
 [Cellystial](https://cellystial.com) in your n8n workflows.
 
-**Cellystial** turns dynamic JSON data into beautiful PDFs from reusable templates. This node
-generates PDFs from your Cellystial templates — one at a time, or in bulk — so you can save,
-email, or upload them in the rest of your workflow.
+**Cellystial** turns dynamic JSON data into beautiful PDFs from reusable templates. This package
+ships two nodes: a **Cellystial** action node that generates PDFs from your templates — one at a
+time, or in bulk — and a **Cellystial Trigger** that starts workflows when Cellystial events fire.
 
 [Installation](#installation) · [Credentials](#credentials) · [Operations](#operations) ·
-[Compatibility](#compatibility) · [Resources](#resources)
+[Trigger](#trigger) · [Compatibility](#compatibility) · [Resources](#resources)
 
 ## Installation
 
@@ -22,7 +22,7 @@ In short, on a self-hosted n8n instance:
 3. Enter `n8n-nodes-cellystial` as the npm package name.
 4. Agree to the risks of using community nodes and select **Install**.
 
-After installation the **Cellystial** node is available in the nodes panel.
+After installation the **Cellystial** and **Cellystial Trigger** nodes are available in the nodes panel.
 
 ## Credentials
 
@@ -50,7 +50,9 @@ Generates a single PDF from a Cellystial template and returns it as binary data.
 | **Put Output File in Field** | The output binary field name (defaults to `data`). |
 
 The output PDF is ready to pass to nodes like **Write Binary File**, **Send Email**, or any HTTP
-upload. When the node receives multiple items, it generates one PDF per item.
+upload. When the node receives multiple items, it generates one PDF per item. Each output item
+carries your **input JSON** through unchanged plus `success: true` (the PDF rides along as binary);
+with **Continue On Fail** enabled, a failed item carries an `error` message instead.
 
 ### Generate PDFs (Batch)
 
@@ -86,6 +88,27 @@ process them individually.
 
 A typical bulk flow: **Generate PDFs (Batch)** → **Wait** → **Get Batch Status** → handle each
 row's `downloadUrl` (or grab the single `zipUrl`).
+
+## Trigger
+
+### Cellystial Trigger
+
+Starts a workflow the moment a Cellystial event fires — so you can react to PDFs and batches as
+they complete instead of polling. On activation the node registers a webhook subscription with
+Cellystial; on deactivation it removes it.
+
+| Setting | Description |
+| --- | --- |
+| **Credential** | A **Cellystial API** credential (the same key the action node uses). |
+| **Events** | One or more events to listen for: **PDF Generated** (`pdf.generated`), **Batch Completed** (`batch.completed`), and **Template Created / Updated / Deleted** (`template.*`). |
+
+Each delivery starts the workflow with the event payload as JSON.
+
+**Security.** Deliveries are signed with a per-subscription secret and sent in an
+`X-Cellystial-Signature` header (`t=<unix>,v1=<hmac-sha256>`). The trigger **verifies every
+request** against the exact received bytes and rejects forged, tampered, or replayed payloads with
+`401` — they never start your workflow. The signing secret is captured automatically when the node
+registers, so there's nothing to configure.
 
 ## Compatibility
 

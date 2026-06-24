@@ -185,6 +185,24 @@ describe('Cellystial Node', () => {
       expect(result[0]).toHaveLength(1);
       expect(result[0][0].json).toEqual({ batchId: 'batch_123', status: 'queued' });
     });
+
+    it('throws a clear error when Row Data is not a JSON object', async () => {
+      const mockContext = {
+        getInputData: () => [{ json: {} }],
+        getNodeParameter: (paramName: string) => {
+          if (paramName === 'operation') return 'generatePdfBatch';
+          if (paramName === 'templateId') return 't1';
+          if (paramName === 'webhookUrl') return '';
+          if (paramName === 'rowData') return '[1,2,3]'; // valid JSON, but an array — not an object
+          return undefined;
+        },
+        helpers: { requestWithAuthentication: async () => ({}) },
+        getNode: () => ({ id: '1', name: 'Cellystial', type: 'cellystial', typeVersion: 1, position: [0, 0], parameters: {} }),
+        continueOnFail: () => false,
+      } as unknown as IExecuteFunctions;
+
+      await expect(node.execute.bind(mockContext)()).rejects.toThrow(/JSON object/i);
+    });
   });
 
   describe('execute - getBatchStatus', () => {
@@ -228,6 +246,39 @@ describe('Cellystial Node', () => {
       expect(result[0]).toHaveLength(2);
       expect(result[0][0].json).toMatchObject({ rowIndex: 0, downloadUrl: 'https://files/0.pdf', zipUrl: 'https://files/batch_123.zip', batchId: 'batch_123' });
       expect(result[0][1].json).toMatchObject({ rowIndex: 1, downloadUrl: 'https://files/1.pdf' });
+    });
+
+    it('emits a single summary item (not per-row) while the batch is still processing', async () => {
+      const mockContext = {
+        getInputData: () => [{ json: {} }],
+        getNodeParameter: (paramName: string) => {
+          if (paramName === 'operation') return 'getBatchStatus';
+          if (paramName === 'batchId') return 'batch_123';
+          return undefined;
+        },
+        helpers: {
+          requestWithAuthentication: async function () {
+            // Backend returns pending rows even while still processing.
+            return {
+              id: 'batch_123',
+              status: 'processing',
+              total: 2,
+              completed: 0,
+              failed: 0,
+              results: [
+                { rowIndex: 0, status: 'pending', downloadUrl: null },
+                { rowIndex: 1, status: 'pending', downloadUrl: null },
+              ],
+            };
+          },
+        },
+        getNode: () => ({ id: '1', name: 'Cellystial', type: 'cellystial', typeVersion: 1, position: [0, 0], parameters: {} }),
+        continueOnFail: () => false,
+      } as unknown as IExecuteFunctions;
+
+      const result = await node.execute.bind(mockContext)();
+      expect(result[0]).toHaveLength(1);
+      expect(result[0][0].json).toMatchObject({ id: 'batch_123', status: 'processing' });
     });
   });
 });

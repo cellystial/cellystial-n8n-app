@@ -1,0 +1,14 @@
+{
+  "node": "n8n-nodes-cellystial.cellystialTrigger",
+  "nodeVersion": "1.0",
+  "codexVersion": "1.0",
+  "categories": ["Utility", "Productivity"],
+  "resources": {
+    "primaryDocumentation": [
+      { "url": "https://cellystial.com/docs" }
+    ],
+    "credentialDocumentation": [
+      { "url": "https://cellystial.com/docs" }
+    ]
+  }
+}

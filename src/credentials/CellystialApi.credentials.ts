@@ -8,6 +8,8 @@ import { CELLYSTIAL_API_BASE_URL } from '../constants';
 export class CellystialApi implements ICredentialType {
   name = 'cellystialApi';
   displayName = 'Cellystial API';
+  // Points at our own docs site; the n8n lint rule assumes docs live on docs.n8n.io.
+  // eslint-disable-next-line n8n-nodes-base/cred-class-field-documentation-url-miscased
   documentationUrl = 'https://cellystial.com/docs';
 
   authenticate = {

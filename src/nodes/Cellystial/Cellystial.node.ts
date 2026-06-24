@@ -14,7 +14,7 @@ export class Cellystial implements INodeType {
   description: INodeTypeDescription = {
     displayName: 'Cellystial',
     name: 'cellystial',
-    icon: 'file:cellystial.png',
+    icon: 'file:cellystial.svg',
     group: ['transform'],
     version: 1,
     subtitle: '={{$parameter["operation"]}}',
@@ -54,7 +54,7 @@ export class Cellystial implements INodeType {
             name: 'Generate PDFs (Batch)',
             value: 'generatePdfBatch',
             description: 'Queue a bulk batch of PDFs from many data rows (async)',
-            action: 'Generate a batch of PDFs',
+            action: 'Generate a PDF batch',
           },
           {
             name: 'Get Batch Status',
@@ -69,7 +69,7 @@ export class Cellystial implements INodeType {
         displayName: 'Template Name or ID',
         name: 'templateId',
         type: 'options',
-        description: 'Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code-examples/expressions/">expression</a>',
+        description: 'Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>',
         typeOptions: {
           loadOptionsMethod: 'getTemplates',
         },
@@ -136,7 +136,7 @@ export class Cellystial implements INodeType {
         name: 'documentId',
         type: 'string',
         default: '',
-        description: 'Optional. Your own unique ID for this row, echoed back in the batch results and used as the PDF filename — so you can map each output PDF to its source (e.g. {{ $json.invoice_no }}). Set it on every row to use this mode, or leave it blank on all rows to map outputs by position instead.',
+        description: 'Optional. Your own unique ID for this row, echoed back in the batch results and used as the PDF filename — so you can map each output PDF to its source (e.g. an invoice number). Set it on every row to use this mode, or leave it blank on all rows to map outputs by position instead.',
         displayOptions: {
           show: {
             operation: ['generatePdfBatch'],
@@ -245,9 +245,21 @@ export class Cellystial implements INodeType {
         } else {
           data = row;
         }
+        // A template row must be a JSON object, not an array or scalar — catch it here
+        // with a clear message instead of a confusing per-item render failure later.
+        if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+          throw new NodeOperationError(this.getNode(), `Item ${i + 1}: "Row Data" must be a JSON object.`, { itemIndex: i });
+        }
         const documentId = ((this.getNodeParameter('documentId', i, '') as string) || '').trim();
         const filename = ((this.getNodeParameter('filename', i, '') as string) || '').trim();
         rows.push({ data, documentId, filename });
+      }
+
+      if (rows.length === 0) {
+        throw new NodeOperationError(
+          this.getNode(),
+          'No rows to generate — the Generate PDFs (Batch) node received no input items.',
+        );
       }
 
       // If Document IDs are supplied, send the keyed `items` shape (each output maps
@@ -306,9 +318,14 @@ export class Cellystial implements INodeType {
             json: true,
           });
 
+          // The backend populates `results` with pending rows as soon as the batch is
+          // queued, so row count can't tell "running" from "done" — gate on the batch
+          // status instead, matching the documented poll-then-handle flow.
+          const status = String(responseData?.status ?? '');
+          const running = status === '' || status === 'queued' || status === 'processing';
           const results = Array.isArray(responseData?.results) ? responseData.results : [];
-          if (results.length > 0) {
-            // Emit one item per row so each generated PDF flows downstream mapped to its source row.
+          if (!running && results.length > 0) {
+            // Finished — emit one item per row so each generated PDF flows downstream mapped to its source row.
             for (const row of results) {
               statusData.push({
                 json: {
@@ -321,8 +338,8 @@ export class Cellystial implements INodeType {
               });
             }
           } else {
-            // Not finished yet (or no rows) — emit the summary so the workflow can poll/branch.
-            statusData.push({ json: responseData, pairedItem: { item: i } });
+            // Still queued/processing (or no rows yet) — emit the summary so the workflow can poll/branch on `status`.
+            statusData.push({ json: responseData ?? { batchId, status }, pairedItem: { item: i } });
           }
         } catch (error) {
           if (this.continueOnFail()) {
@@ -350,7 +367,7 @@ export class Cellystial implements INodeType {
           try {
             payload = JSON.parse(rawPayload);
           } catch (e) {
-            throw new Error('The "JSON Payload" field does not contain valid JSON.');
+            throw new NodeOperationError(this.getNode(), 'The "JSON Payload" field does not contain valid JSON.', { itemIndex: i });
           }
         } else {
           payload = rawPayload;
