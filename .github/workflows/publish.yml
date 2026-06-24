@@ -20,11 +20,15 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           registry-url: 'https://registry.npmjs.org'
 
+      # --ignore-scripts skips dependency build scripts. The only native dep here is
+      # isolated-vm (pulled in transitively via n8n-workflow for n8n's expression
+      # sandbox) — we never use it to lint/test/build/publish this package, and
+      # compiling it from source is slow and breaks on mismatched Node/V8 versions.
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Lint (n8n community ruleset)
         run: npm run lint
