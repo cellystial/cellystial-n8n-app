@@ -1,0 +1,44 @@
+name: Publish to npm
+
+# Triggered by a version tag (created by `npm run release`). Publishes the package
+# to npm WITH a provenance attestation — required by n8n's verified community node
+# program (locally-published versions are not accepted as of 2026-05-01).
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+  id-token: write # REQUIRED for npm provenance (OIDC attestation)
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint (n8n community ruleset)
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      # --provenance generates a signed attestation linking this npm release to this
+      # exact commit + workflow run. Needs npm >=9.5 (node 20 ships npm 10) and the
+      # id-token: write permission above.
+      - name: Publish (with provenance)
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
