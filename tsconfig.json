@@ -5,6 +5,7 @@
     "lib": ["ES2019", "DOM"],
     "outDir": "./dist",
     "rootDir": ".",
+    "removeComments": true,
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,

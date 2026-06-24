@@ -25,7 +25,7 @@ describe('Cellystial Node', () => {
       // Mock n8n ILoadOptionsFunctions context
       const mockContext = {
         helpers: {
-          requestWithAuthentication: async function(credentialType: string, options: IHttpRequestOptions) {
+          httpRequestWithAuthentication: async function(credentialType: string, options: IHttpRequestOptions) {
             // Mimic the n8n request wrapper behavior using native fetch/axios/request
             const fetch = require('node-fetch');
             const res = await fetch(options.url, { method: options.method });
@@ -63,7 +63,7 @@ describe('Cellystial Node', () => {
           return undefined;
         },
         helpers: {
-          requestWithAuthentication: async function(credentialType: string, options: IHttpRequestOptions) {
+          httpRequestWithAuthentication: async function(credentialType: string, options: IHttpRequestOptions) {
             const fetch = require('node-fetch');
             const res = await fetch(options.url, {
               method: options.method,
@@ -105,7 +105,7 @@ describe('Cellystial Node', () => {
           return undefined;
         },
         helpers: {
-          requestWithAuthentication: async function(credentialType: string, options: IHttpRequestOptions) {
+          httpRequestWithAuthentication: async function(credentialType: string, options: IHttpRequestOptions) {
             const error = new Error('400 Bad Request') as Error & { response?: { body?: Buffer } };
             error.response = { body: Buffer.from(JSON.stringify({ message: ['Invalid payload missing amount'] })) };
             throw error;
@@ -132,7 +132,7 @@ describe('Cellystial Node', () => {
           return undefined;
         },
         helpers: {
-          requestWithAuthentication: async function(credentialType: string, options: IHttpRequestOptions) {
+          httpRequestWithAuthentication: async function(credentialType: string, options: IHttpRequestOptions) {
             const error = new Error('400 Bad Request') as Error & { response?: { body?: Buffer } };
             error.response = { body: Buffer.from(JSON.stringify({ message: ['Invalid payload missing amount'] })) };
             throw error;
@@ -164,7 +164,7 @@ describe('Cellystial Node', () => {
           return undefined;
         },
         helpers: {
-          requestWithAuthentication: async function(credentialType: string, options: IHttpRequestOptions) {
+          httpRequestWithAuthentication: async function(credentialType: string, options: IHttpRequestOptions) {
             capturedUrl = options.url;
             capturedBody = options.body;
             return { batchId: 'batch_123', status: 'queued' };
@@ -196,7 +196,7 @@ describe('Cellystial Node', () => {
           if (paramName === 'rowData') return '[1,2,3]'; // valid JSON, but an array — not an object
           return undefined;
         },
-        helpers: { requestWithAuthentication: async () => ({}) },
+        helpers: { httpRequestWithAuthentication: async () => ({}) },
         getNode: () => ({ id: '1', name: 'Cellystial', type: 'cellystial', typeVersion: 1, position: [0, 0], parameters: {} }),
         continueOnFail: () => false,
       } as unknown as IExecuteFunctions;
@@ -218,7 +218,7 @@ describe('Cellystial Node', () => {
           return undefined;
         },
         helpers: {
-          requestWithAuthentication: async function(credentialType: string, options: IHttpRequestOptions) {
+          httpRequestWithAuthentication: async function(credentialType: string, options: IHttpRequestOptions) {
             capturedUrl = options.url;
             capturedMethod = options.method;
             return {
@@ -257,7 +257,7 @@ describe('Cellystial Node', () => {
           return undefined;
         },
         helpers: {
-          requestWithAuthentication: async function () {
+          httpRequestWithAuthentication: async function () {
             // Backend returns pending rows even while still processing.
             return {
               id: 'batch_123',

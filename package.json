@@ -27,6 +27,9 @@
   "engines": {
     "node": ">=20"
   },
+  "peerDependencies": {
+    "n8n-workflow": "*"
+  },
   "main": "dist/index.js",
   "files": [
     "dist"

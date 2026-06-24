@@ -23,7 +23,7 @@ describe('CellystialTrigger Node', () => {
         getWorkflowStaticData: (_type: string) => staticData,
         getNode: () => ({ name: 'Cellystial Trigger' }),
         helpers: {
-          requestWithAuthentication: async function (
+          httpRequestWithAuthentication: async function (
             credentialType: string,
             options: { method?: string; url?: string; body?: unknown },
           ) {
@@ -54,7 +54,7 @@ describe('CellystialTrigger Node', () => {
         getWorkflowStaticData: (_type: string) => staticData,
         getNode: () => ({ name: 'Cellystial Trigger' }),
         helpers: {
-          requestWithAuthentication: async function () {
+          httpRequestWithAuthentication: async function () {
             return { id: 'wh_2', secret: 'whsec_abc123' };
           },
         },
@@ -74,7 +74,7 @@ describe('CellystialTrigger Node', () => {
         getWorkflowStaticData: (_type: string) => staticData,
         getNode: () => ({ name: 'Cellystial Trigger' }),
         helpers: {
-          requestWithAuthentication: async function (_c: string, options: { method?: string; url?: string }) {
+          httpRequestWithAuthentication: async function (_c: string, options: { method?: string; url?: string }) {
             calls.push({ method: options.method, url: options.url });
             return options.method === 'POST' ? { id: 'wh_nosecret' } : {};
           },
@@ -107,7 +107,7 @@ describe('CellystialTrigger Node', () => {
       const ctx = {
         getWorkflowStaticData: (_type: string) => staticData,
         helpers: {
-          requestWithAuthentication: async function (credentialType: string, options: { method?: string; url?: string }) {
+          httpRequestWithAuthentication: async function (credentialType: string, options: { method?: string; url?: string }) {
             captured = options;
             return {};
           },

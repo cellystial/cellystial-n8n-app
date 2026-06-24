@@ -118,7 +118,7 @@ export class CellystialTrigger implements INodeType {
 
         let response: { id?: string; secret?: string } | undefined;
         try {
-          response = await this.helpers.requestWithAuthentication.call(this, 'cellystialApi', {
+          response = await this.helpers.httpRequestWithAuthentication.call(this, 'cellystialApi', {
             method: 'POST',
             url: `${CELLYSTIAL_API_BASE_URL}/api/v1/webhooks`,
             body: { url: webhookUrl, events, description: 'n8n' },
@@ -142,7 +142,7 @@ export class CellystialTrigger implements INodeType {
         // fail loudly rather than register one whose deliveries we'd have to reject.
         if (typeof response.secret !== 'string' || !response.secret) {
           try {
-            await this.helpers.requestWithAuthentication.call(this, 'cellystialApi', {
+            await this.helpers.httpRequestWithAuthentication.call(this, 'cellystialApi', {
               method: 'DELETE',
               url: `${CELLYSTIAL_API_BASE_URL}/api/v1/webhooks/${encodeURIComponent(response.id)}`,
               json: true,
@@ -169,7 +169,7 @@ export class CellystialTrigger implements INodeType {
           return true;
         }
         try {
-          await this.helpers.requestWithAuthentication.call(this, 'cellystialApi', {
+          await this.helpers.httpRequestWithAuthentication.call(this, 'cellystialApi', {
             method: 'DELETE',
             url: `${CELLYSTIAL_API_BASE_URL}/api/v1/webhooks/${encodeURIComponent(subscriptionId)}`,
             json: true,

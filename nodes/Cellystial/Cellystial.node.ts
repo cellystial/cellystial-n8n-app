@@ -188,7 +188,7 @@ export class Cellystial implements INodeType {
       async getTemplates(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
         let responseData;
         try {
-          responseData = await this.helpers.requestWithAuthentication.call(this, 'cellystialApi', {
+          responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'cellystialApi', {
             method: 'GET',
             url: `${CELLYSTIAL_API_BASE_URL}/api/v1/integration/templates`,
             qs: {
@@ -291,7 +291,7 @@ export class Cellystial implements INodeType {
       const pairedItem = items.map((_, i) => ({ item: i }));
 
       try {
-        const responseData = await this.helpers.requestWithAuthentication.call(this, 'cellystialApi', {
+        const responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'cellystialApi', {
           method: 'POST',
           url: `${CELLYSTIAL_API_BASE_URL}/api/v1/generate/batch`,
           body,
@@ -312,7 +312,7 @@ export class Cellystial implements INodeType {
       for (let i = 0; i < items.length; i++) {
         try {
           const batchId = this.getNodeParameter('batchId', i) as string;
-          const responseData = await this.helpers.requestWithAuthentication.call(this, 'cellystialApi', {
+          const responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'cellystialApi', {
             method: 'GET',
             url: `${CELLYSTIAL_API_BASE_URL}/api/v1/generate/batch/${encodeURIComponent(batchId)}`,
             json: true,
@@ -374,7 +374,7 @@ export class Cellystial implements INodeType {
         }
 
         // Generate the PDF and receive it as a raw binary buffer.
-        const responseData = await this.helpers.requestWithAuthentication.call(this, 'cellystialApi', {
+        const responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'cellystialApi', {
           method: 'POST',
           url: `${CELLYSTIAL_API_BASE_URL}/api/v1/generate`,
           body: JSON.stringify({
@@ -385,10 +385,10 @@ export class Cellystial implements INodeType {
             'Content-Type': 'application/json',
             'Accept': 'application/pdf',
           },
-          encoding: null, // Required to receive a binary buffer instead of a parsed string
+          encoding: 'arraybuffer', // receive the PDF as a binary buffer (httpRequest/axios convention)
         });
 
-        const binaryData = await this.helpers.prepareBinaryData(responseData, fileName, 'application/pdf');
+        const binaryData = await this.helpers.prepareBinaryData(Buffer.from(responseData as ArrayBuffer), fileName, 'application/pdf');
 
         returnData.push({
           // Carry the input item's JSON through so downstream fields aren't lost,
