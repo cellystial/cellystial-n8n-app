@@ -32,11 +32,11 @@
     "dist"
   ],
   "scripts": {
-    "build": "rm -rf dist && tsc && cp src/nodes/Cellystial/*.png src/nodes/Cellystial/*.svg src/nodes/Cellystial/*.json dist/nodes/Cellystial/",
+    "build": "rm -rf dist && tsc && cp nodes/Cellystial/*.png nodes/Cellystial/*.svg nodes/Cellystial/*.json dist/nodes/Cellystial/",
     "dev": "tsc --watch",
     "test": "jest",
-    "lint": "eslint package.json \"src/**/*.ts\"",
-    "lintfix": "eslint --fix package.json \"src/**/*.ts\"",
+    "lint": "eslint package.json \"nodes/**/*.ts\" \"credentials/**/*.ts\"",
+    "lintfix": "eslint --fix package.json \"nodes/**/*.ts\" \"credentials/**/*.ts\"",
     "release": "npm version patch -m \"v%s\" && git push --follow-tags",
     "prepublishOnly": "npm run lint && npm run build"
   },

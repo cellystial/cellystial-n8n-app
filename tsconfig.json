@@ -4,17 +4,21 @@
     "target": "ES2019",
     "lib": ["ES2019", "DOM"],
     "outDir": "./dist",
-    "rootDir": "./src",
+    "rootDir": ".",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
   "include": [
-    "src/**/*.ts"
+    "index.ts",
+    "constants.ts",
+    "credentials/**/*.ts",
+    "nodes/**/*.ts"
   ],
   "exclude": [
     "node_modules",
+    "dist",
     "**/*.spec.ts",
     "**/*.test.ts",
     "**/__tests__/**"
