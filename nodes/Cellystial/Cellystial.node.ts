@@ -19,6 +19,10 @@ export class Cellystial implements INodeType {
     version: 1,
     subtitle: '={{$parameter["operation"]}}',
     description: 'Generate PDFs via Cellystial API',
+    // Lets the node be attached as a tool to an AI Agent. In n8n 2.x this flag is the
+    // ONLY gate for tool eligibility (the old N8N_COMMUNITY_PACKAGES_ALLOW_TOOL_USAGE
+    // env var was removed); n8n filters tool candidates on Boolean(description.usableAsTool).
+    usableAsTool: true,
     defaults: {
       name: 'Cellystial',
     },
