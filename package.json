@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-cellystial",
-  "version": "1.2.5",
+  "version": "1.2.6",
   "description": "n8n community node for Cellystial — generate PDFs from templates via the Cellystial API",
   "keywords": [
     "n8n-community-node-package",

@@ -5,6 +5,8 @@ import {
   INodeType,
   INodeTypeDescription,
   IWebhookResponseData,
+  JsonObject,
+  NodeApiError,
   NodeOperationError,
 } from 'n8n-workflow';
 import * as crypto from 'crypto';
@@ -125,7 +127,7 @@ export class CellystialTrigger implements INodeType {
             json: true,
           });
         } catch (error) {
-          throw new NodeOperationError(this.getNode(), error as Error, {
+          throw new NodeApiError(this.getNode(), error as JsonObject, {
             message: 'Could not register the Cellystial webhook subscription. Check that your API key is valid.',
           });
         }

@@ -6,6 +6,8 @@ import {
   INodeTypeDescription,
   ILoadOptionsFunctions,
   INodePropertyOptions,
+  JsonObject,
+  NodeApiError,
   NodeOperationError,
 } from 'n8n-workflow';
 import { CELLYSTIAL_API_BASE_URL } from '../../constants';
@@ -34,13 +36,6 @@ export class Cellystial implements INodeType {
         required: true,
       },
     ],
-    requestDefaults: {
-      baseURL: CELLYSTIAL_API_BASE_URL,
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-      },
-    },
     properties: [
       {
         displayName: 'Operation',
@@ -201,7 +196,7 @@ export class Cellystial implements INodeType {
             json: true,
           });
         } catch (error) {
-          throw new NodeOperationError(this.getNode(), error as Error, {
+          throw new NodeApiError(this.getNode(), error as JsonObject, {
             message: 'Could not load Cellystial templates. Check that your API key is valid.',
           });
         }
@@ -306,7 +301,7 @@ export class Cellystial implements INodeType {
         if (this.continueOnFail()) {
           return [[{ json: { error: error instanceof Error ? error.message : String(error) }, pairedItem }]];
         }
-        throw new NodeOperationError(this.getNode(), error as Error, { message: 'Cellystial batch generation failed.' });
+        throw new NodeApiError(this.getNode(), error as JsonObject);
       }
     }
 
@@ -350,7 +345,7 @@ export class Cellystial implements INodeType {
             statusData.push({ json: { error: error instanceof Error ? error.message : String(error) }, pairedItem: { item: i } });
             continue;
           }
-          throw new NodeOperationError(this.getNode(), error as Error, { itemIndex: i });
+          throw new NodeApiError(this.getNode(), error as JsonObject, { itemIndex: i });
         }
       }
       return [statusData];
@@ -427,7 +422,7 @@ export class Cellystial implements INodeType {
           continue;
         }
 
-        throw new NodeOperationError(this.getNode(), errorMessage, { itemIndex: i });
+        throw new NodeApiError(this.getNode(), error as JsonObject, { message: errorMessage, itemIndex: i });
       }
     }
 
